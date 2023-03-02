@@ -167,7 +167,7 @@ class APITimestampEx(APIException):
 
 
 class NotFoundAccessKeyEx(APIException):
-    def __init__(self, api_key: str,  ex: Exception = None):
+    def __init__(self, api_key: str, ex: Exception = None):
         super().__init__(
             status_code=StatusCode.HTTP_404,
             msg=f"API 키를 찾을 수 없습니다.",

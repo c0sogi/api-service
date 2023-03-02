@@ -1,6 +1,5 @@
-from dataclasses import dataclass, asdict  # field
+from dataclasses import dataclass, asdict
 from os import environ
-from typing import Union, Optional
 from pathlib import Path
 from urllib import parse
 
@@ -79,8 +78,8 @@ ERROR_RESPONSES = {
 }
 
 JWT_ALGORITHM = "HS256"
-EXCEPT_PATH_LIST = ["/", "/openapi.json"]
-EXCEPT_PATH_REGEX = "^(/docs|/redoc|/api/auth|/favicon.ico)"
+EXCEPT_PATH_LIST = ["/", "/openapi.json", "/favicon.ico"]
+EXCEPT_PATH_REGEX = "^(/docs|/redoc|/api/auth)"
 MAX_API_KEY = 3
 MAX_API_WHITELIST = 10
 KAKAO_IMAGE_URL = "http://k.kakaocdn.net/dn/wwWjr/btrYVhCnZDF/2bgXDJth2LyIajIjILhLK0/kakaolink40_original.png"
@@ -96,13 +95,12 @@ class Config(metaclass=SingletonMetaClass):
     db_url: str = DB_URL
     schema_name: str = MYSQL_DATABASE
 
-    @property
-    def get(self):
-        return {
-            "prod": ProdConfig,
-            "local": LocalConfig,
-            "test": TestConfig,
-        }[environ.get("API_ENV", "local")]()
+    @staticmethod
+    def get(option: str = None):
+        config_key = option if option is not None else environ.get("API_ENV", "local")
+        return {"prod": ProdConfig, "local": LocalConfig, "test": TestConfig}[
+            config_key
+        ]()
 
 
 @dataclass(frozen=True)
@@ -139,10 +137,3 @@ class TestConfig(Config, metaclass=SingletonMetaClass):
     test_db_url: str = TEST_DB_URL
     trusted_hosts = ["*"]
     allowed_sites = ["*"]
-
-
-def get_config(
-    option: Optional[str] = None,
-) -> Union[LocalConfig, ProdConfig, TestConfig]:
-    config_key = option if option is not None else environ.get("API_ENV", "local")
-    return {"prod": ProdConfig, "local": LocalConfig, "test": TestConfig}[config_key]()

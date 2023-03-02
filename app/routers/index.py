@@ -13,31 +13,20 @@ from fastapi.requests import Request
 router = APIRouter(tags=["index"])
 
 
-@router.get("/")
-async def index():
-    return FileResponse("./app/web/index.html")
-
-
-@router.get("/{filename}.js")
-async def js(filename: str):
-    print("JS!!")
-    return FileResponse(f"./app/web/{filename}.js")
-
-
-@router.get("/favicon.ico", include_in_schema=False)
-async def favicon():
+@router.get("/favicon.ico")
+async def favicon_ico():
     return FileResponse("app/contents/favicon.ico")
 
 
 @router.get("/test")
-async def test(req: Request):
+async def test(request: Request):
     """
     ELB status check
     """
     try:
         ...
     except Exception as exception:
-        req.state.inspect = frame()
+        request.state.inspect = frame()
         raise exception
     else:
-        return {"user_status": req.state.user}
+        return {"user_status": request.state.user}

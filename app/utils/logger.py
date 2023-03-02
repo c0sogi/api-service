@@ -47,16 +47,12 @@ async def api_logger(
     error: Optional[Union[SqlFailureEx, APIException]] = None,
     **kwargs,
 ):
-    processed_time = time() - request.state.start
-    status_code = error.status_code if error else response.status_code
     user = request.state.user
-    utc_now = datetime.utcnow()
-
     log = json.dumps(
         {
             "url": request.url.hostname + request.url.path,
             "method": str(request.method),
-            "statusCode": status_code,
+            "statusCode": error.status_code if error else response.status_code,
             "errorDetail": await error_log_generator(error=error, request=request)
             if error is not None
             else None,
@@ -67,9 +63,11 @@ async def api_logger(
                 if user and user.email
                 else None,
             },
-            "processedTime": str(round(processed_time * 1000, 5)) + "ms",
-            "datetimeUTC": utc_now.strftime("%Y/%m/%d %H:%M:%S"),
-            "datetimeKST": (utc_now + timedelta(hours=9)).strftime("%Y/%m/%d %H:%M:%S"),
+            "processedTime": str(round((time() - request.state.start) * 1000, 5))
+            + "ms",
+            "datetimeKST": (datetime.utcnow() + timedelta(hours=9)).strftime(
+                "%Y/%m/%d %H:%M:%S"
+            ),
         }
         | kwargs
     )

@@ -41,22 +41,16 @@ def create_app(config: Union[LocalConfig, ProdConfig, TestConfig]) -> FastAPI:
         except_path=["/health"],
     )
 
-    # Routers
+    new_app.mount("/", StaticFiles(directory="./app/web", html=True))
     new_app.include_router(index.router)
-    new_app.mount("/assets", StaticFiles(directory="app/web/assets"))
-    new_app.mount("/canvaskit", StaticFiles(directory="app/web/canvaskit"))
-    new_app.mount("/icons", StaticFiles(directory="app/web/icons"))
     new_app.include_router(auth.router, prefix="/api", tags=["auth"])
     new_app.include_router(
         services.router,
         prefix="/api",
         tags=["Services"],
-        dependencies=[Depends(user_dependency)],
-    ) if config.debug else new_app.include_router(
-        services.router,
-        prefix="/api",
-        tags=["Services"],
-        dependencies=[Depends(user_dependency), Depends(api_service_dependency)],
+        dependencies=[Depends(user_dependency)]
+        if config.debug
+        else [Depends(user_dependency), Depends(api_service_dependency)],
     )
     new_app.include_router(
         users.router,

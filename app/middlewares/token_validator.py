@@ -1,3 +1,5 @@
+from datetime import datetime
+from types import FrameType
 from jwt import decode as jwt_decode
 from time import time
 from re import match
@@ -8,12 +10,11 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from app.common.config import (
-    get_config,
+    Config,
     EXCEPT_PATH_LIST,
     EXCEPT_PATH_REGEX,
     JWT_SECRET,
     JWT_ALGORITHM,
-    SAMPLE_JWT_TOKEN,
 )
 from app.database.schema import Users, ApiKeys
 from app.errors import exceptions as ex
@@ -24,32 +25,33 @@ from app.utils.logger import api_logger
 from app.utils.query_utils import query_row_to_dict
 from app.utils.encoding_and_hashing import hash_params
 
-config = get_config()
+config: Config = Config.get()
 
 
 async def access_control(request: Request, call_next: RequestResponseEndpoint):
     headers, cookies = request.headers, request.cookies
-    url = request.url.path
-    query_params = str(request.query_params)
+    url_path = request.url.path
     ip = request.client.host
 
     response: Optional[Response] = None
     error: Optional[Union[SqlFailureEx, APIException]] = None
-    request.state.req_time = UTC.now()
-    request.state.start = time()
-    request.state.inspect = None
-    request.state.user = None
-    request.state.service = None
-    request.state.ip = ip.split(",")[0] if "," in ip else ip
-
-    if await url_pattern_check(url, EXCEPT_PATH_REGEX) or url in EXCEPT_PATH_LIST:
+    request.state.req_time: datetime = UTC.now()
+    request.state.start: float = time()
+    request.state.inspect: FrameType = None
+    request.state.user: UserToken = None
+    request.state.service: str = None
+    request.state.ip: str = ip.split(",")[0] if "," in ip else ip
+    if url_path in EXCEPT_PATH_LIST:
         response = await call_next(request)
-        if url != "/":
-            await api_logger(request=request, response=response)
         return response
 
+    elif await url_pattern_check(url_path, EXCEPT_PATH_REGEX):
+        response = await call_next(request)
+        await api_logger(request=request, response=response)
+        return response
     try:
-        if url.startswith("/api/services"):  # Api-services must use session
+
+        if url_path.startswith("/api/services"):  # Api-services must use session
             if config.debug:
                 # [NON-LOCAL] Validate token by headers(Authorization) with session
                 if "authorization" not in headers.keys():
@@ -58,9 +60,10 @@ async def access_control(request: Request, call_next: RequestResponseEndpoint):
                 request.state.user = await validate_access_key(
                     access_key, query_from_session=True
                 )
-            else:  # [LOCAL] Validate token by headers(secret) and queries(key, timestamp) with session
+            else:
+                # [LOCAL] Validate token by headers(secret) and queries(key, timestamp) with session
                 access_key, timestamp = await queries_params_to_key_and_timestamp(
-                    query_params
+                    str(request.query_params)
                 )
                 if "secret" not in headers.keys():
                     raise ex.APIHeaderInvalidEx()
@@ -68,14 +71,13 @@ async def access_control(request: Request, call_next: RequestResponseEndpoint):
                     access_key,
                     query_from_session=True,
                     query_check=True,
-                    query_params=query_params,
+                    query_params=str(request.query_params),
                     secret=headers["secret"],
                     timestamp=timestamp,
                 )
 
-        elif url.startswith("/api") or url.startswith("/auth"):
-            # Api-non-services don't use session
-            # Validate token by headers(Authorization)
+        elif url_path.startswith("/api") or url_path.startswith("/auth"):
+            # Api-non-services don't use session, Validate token by headers(Authorization)
             if "authorization" in headers.keys():
                 request.state.user = await validate_access_key(
                     headers.get("authorization")
@@ -109,8 +111,7 @@ async def access_control(request: Request, call_next: RequestResponseEndpoint):
             error=error,
             cookies=cookies,
             headers=dict(headers),
-            query_params=query_params,
-        ) if url.startswith("/api/services") or error is not None else ...
+        ) if url_path.startswith("/api/services") or error is not None else ...
         return response
 
 
