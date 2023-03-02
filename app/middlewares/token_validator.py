@@ -73,19 +73,22 @@ async def access_control(request: Request, call_next: RequestResponseEndpoint):
                     timestamp=timestamp,
                 )
 
-        elif url.startswith("/api"):  # Api-non-services don't use session
+        elif url.startswith("/api") or url.startswith("/auth"):
+            # Api-non-services don't use session
             # Validate token by headers(Authorization)
-            if "authorization" not in headers.keys():
+            if "authorization" in headers.keys():
+                request.state.user = await validate_access_key(
+                    headers.get("authorization")
+                )
+            elif "Authorization" in cookies.keys():
+                request.state.user = await validate_access_key(
+                    cookies.get("Authorization")
+                )
+            else:
                 raise ex.NotAuthorized()
-            request.state.user = await validate_access_key(headers.get("authorization"))
 
-        else:  # Non-api pages with template rendering don't use session
-            # Validate token by cookies(Authorization)
-            if url.startswith("/test"):
-                cookies["Authorization"] = SAMPLE_JWT_TOKEN
-            if "Authorization" not in cookies.keys():
-                raise ex.NotAuthorized()
-            request.state.user = await validate_access_key(cookies.get("Authorization"))
+        else:
+            ...
         response = await call_next(request)
 
     except Exception as exception:  # If any error occurs...

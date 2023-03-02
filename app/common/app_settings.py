@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from dataclasses import asdict
@@ -24,7 +25,7 @@ def create_app(config: Union[LocalConfig, ProdConfig, TestConfig]) -> FastAPI:
     """
     Access control middleware: Authorized request only
     CORS middleware: Allowed sites only
-    Trusted host middleware: Allowed host only 
+    Trusted host middleware: Allowed host only
     """
     new_app.add_middleware(dispatch=access_control, middleware_class=BaseHTTPMiddleware)
     new_app.add_middleware(
@@ -42,6 +43,9 @@ def create_app(config: Union[LocalConfig, ProdConfig, TestConfig]) -> FastAPI:
 
     # Routers
     new_app.include_router(index.router)
+    new_app.mount("/assets", StaticFiles(directory="app/web/assets"))
+    new_app.mount("/canvaskit", StaticFiles(directory="app/web/canvaskit"))
+    new_app.mount("/icons", StaticFiles(directory="app/web/icons"))
     new_app.include_router(auth.router, prefix="/api", tags=["auth"])
     new_app.include_router(
         services.router,

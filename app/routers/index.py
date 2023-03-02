@@ -1,7 +1,7 @@
-from datetime import datetime
+# from datetime import datetime
 from inspect import currentframe as frame
 from fastapi import APIRouter
-from fastapi.responses import Response, FileResponse
+from fastapi.responses import FileResponse
 from fastapi.requests import Request
 
 # from app.background_tasks import background_task_state
@@ -15,19 +15,13 @@ router = APIRouter(tags=["index"])
 
 @router.get("/")
 async def index():
-    now = f"API Time (UTC: {datetime.utcnow().strftime('%Y.%m.%d %H:%M:%S')})"
-    # Users.create_db_model_instance(
-    #     session=session,
-    #     auto_commit=True,
-    #     status="active",
-    #     name="name_test",
-    #     email="www@www.com",
-    # )
-    # return Response()
-    return Response(
-        now,
-        media_type="application/json; charset=utf8mb4",
-    )
+    return FileResponse("./app/web/index.html")
+
+
+@router.get("/{filename}.js")
+async def js(filename: str):
+    print("JS!!")
+    return FileResponse(f"./app/web/{filename}.js")
 
 
 @router.get("/favicon.ico", include_in_schema=False)
