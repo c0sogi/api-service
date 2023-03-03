@@ -23,7 +23,7 @@ from app.routers.auth import create_access_token
 
 @pytest.fixture(scope="session")
 def app():
-    return create_app(TestConfig)
+    return create_app(TestConfig())
 
 
 @pytest.fixture(scope="session")

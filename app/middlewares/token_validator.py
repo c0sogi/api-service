@@ -1,14 +1,12 @@
-from datetime import datetime
-from types import FrameType
 from jwt import decode as jwt_decode
 from time import time
 from re import match
 from typing import Union, Tuple, Optional
 from sqlalchemy.exc import OperationalError
 from jwt.exceptions import ExpiredSignatureError, DecodeError
-from starlette.middleware.base import RequestResponseEndpoint
+from starlette.middleware.base import Response, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse
 from app.common.config import (
     Config,
     EXCEPT_PATH_LIST,
@@ -35,14 +33,14 @@ async def access_control(request: Request, call_next: RequestResponseEndpoint):
 
     response: Optional[Response] = None
     error: Optional[Union[SqlFailureEx, APIException]] = None
-    request.state.req_time: datetime = UTC.now()
-    request.state.start: float = time()
-    request.state.inspect: FrameType = None
-    request.state.user: UserToken = None
-    request.state.service: str = None
-    request.state.ip: str = ip.split(",")[0] if "," in ip else ip
+    request.state.req_time = UTC.now()
+    request.state.start = time()
+    request.state.inspect = None
+    request.state.user = None
+    request.state.service = None
+    request.state.ip = ip.split(",")[0] if "," in ip else ip
     if url_path in EXCEPT_PATH_LIST:
-        response = await call_next(request)
+        response: Response = await call_next(request)
         return response
 
     elif await url_pattern_check(url_path, EXCEPT_PATH_REGEX):
@@ -50,13 +48,12 @@ async def access_control(request: Request, call_next: RequestResponseEndpoint):
         await api_logger(request=request, response=response)
         return response
     try:
-
         if url_path.startswith("/api/services"):  # Api-services must use session
             if config.debug:
                 # [NON-LOCAL] Validate token by headers(Authorization) with session
                 if "authorization" not in headers.keys():
                     raise ex.NotAuthorized()
-                access_key = headers.get("authorization")
+                access_key: str = headers.get("authorization")
                 request.state.user = await validate_access_key(
                     access_key, query_from_session=True
                 )
@@ -119,7 +116,9 @@ async def validate_access_key(
     access_key: str,
     query_from_session: bool = False,
     query_check: bool = False,
-    **kwargs
+    secret: str = None,
+    query_params: str = None,
+    timestamp: str = None,
 ) -> UserToken:
     if query_from_session:  # Find API key from session
         api_key_query = await ApiKeys.get_row_from_db(access_key=access_key)
@@ -131,14 +130,12 @@ async def validate_access_key(
         user_info: dict = query_row_to_dict(user_query)
 
         if query_check:  # Validate queries with timestamp and secret
-            if not kwargs.get("secret") == hash_params(
-                qs=kwargs.get("query_params"), secret_key=api_key_query.secret_key
+            if not secret == hash_params(
+                qs=query_params, secret_key=api_key_query.secret_key
             ):
                 raise ex.APIHeaderInvalidEx()
             now_timestamp: int = UTC.timestamp(hour_diff=9)
-            if not (
-                now_timestamp - 10 < int(kwargs.get("timestamp")) < now_timestamp + 10
-            ):
+            if not (now_timestamp - 10 < int(timestamp) < now_timestamp + 10):
                 raise ex.APITimestampEx()
         return UserToken(**user_info)
 
